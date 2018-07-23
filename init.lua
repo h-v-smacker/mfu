@@ -10,19 +10,7 @@ end
 
 
 local prepare_formspec = function(channel)
--- 	local label = "nothing"
--- 	local item = "air"
--- 	local hint = ""
--- 	local percent = 0
--- 	if contents then
--- 		hint = liquids[contents].name
--- 		label = contents
--- 		item = liquids[contents].bucket
--- 	end
--- 	if fill then 
--- 		percent = 100 * fill / barrel_max
--- 	end
--- 	
+
 	local c = ''
 	if channel then
 		c = channel
@@ -121,13 +109,15 @@ local mfu_copy = function(pos, elapsed)
 	local copy = ItemStack({name = "default:book_written", count = 1})
 	copy:get_meta():from_table(master_contents)
 	  
-	if inv:room_for_item ("output", copy) then
+	if inv:room_for_item("output", copy) then
 		if inv:contains_item("input", {name = "default:book", count = 1}) then
 			inv:remove_item("input", {name = "default:book", count = 1})
+			inv:add_item("output", copy)
 		elseif inv:contains_item("input", {name = "default:paper", count = 3}) then
 			inv:remove_item("input", {name = "default:paper", count = 3})
+			inv:add_item("output", copy)
 		end
-		inv:add_item("output", copy)
+		
 	end
 	
 	-- and continue [trying] making copies as long as there's a master copy in the slot
@@ -149,6 +139,105 @@ local mfu_can_dig = function(pos, player)
 	
 	return (inv:is_empty("input") and inv:is_empty("output") and inv:is_empty("master"))
 	
+end
+
+local mfu_on_digiline_receive = function (pos, _, channel, msg)
+	local meta = minetest.get_meta(pos);
+	local listen_on = meta:get_string('digiline_channel')
+	local inv = meta:get_inventory()
+	
+	if listen_on and channel == listen_on and msg.command and msg.command == "STATUS" then
+		
+		if not inv:contains_item("input", {name = "default:book", count = 1}) and 
+			not inv:contains_item("input", {name = "default:paper", count = 3}) then
+			digilines.receptor_send(pos, digilines.rules.default, channel, "NO PAPER")
+		elseif not inv:room_for_item("output", {name = "default:book_written", count = 1}) then
+			digilines.receptor_send(pos, digilines.rules.default, channel, "OUTPUT FULL")
+		elseif not inv:is_empty("master") then
+			digilines.receptor_send(pos, digilines.rules.default, channel, "COPYING")
+		else
+			digilines.receptor_send(pos, digilines.rules.default, channel, "IDLE")
+		end
+		
+		return
+	end
+	
+	if listen_on and channel == listen_on and msg.command and msg.command == "PRINT" and msg.copies and tonumber(msg.copies) > 0 then
+		
+		-- default book settings
+		local max_text_size = 10000
+		local max_title_size = 80
+		local short_title_size = 35
+		local lpp = 14
+		
+		-----
+		local book = ItemStack({name = "default:book_written", count = 1})
+		local data = {}
+
+		data.owner = S("MFU (automatic)")
+		if msg.author then
+			data.owner = msg.author .. S(" (printed)")
+		end
+
+		data.title = S("Untitled")
+		if msg.title then
+			data.title = msg.title:sub(1, max_title_size)
+		end
+		
+		local short_title = data.title
+		-- Don't bother triming the title if the trailing dots would make it longer
+		if #short_title > short_title_size + 3 then
+			short_title = short_title:sub(1, short_title_size) .. "..."
+		end
+		data.description = "\""..short_title.."\" by "..data.owner
+		data.text = msg.text:sub(1, max_text_size)
+		data.text = data.text:gsub("\r\n", "\n"):gsub("\r", "\n")
+		data.page = 1
+		data.page_max = math.ceil((#data.text:gsub("[^\n]", "") + 1) / lpp)
+
+		if msg.watermark then
+			data.watermark = msg.watermark
+		end
+		
+		book:get_meta():from_table({ fields = data })
+		
+		-----
+		
+		if not inv:contains_item("input", {name = "default:book", count = 1}) and 
+			not inv:contains_item("input", {name = "default:paper", count = 3}) then
+			
+				digilines.receptor_send(pos, digilines.rules.default, channel, "NO PAPER")
+				
+		else
+
+		
+			local n = tonumber(msg.copies)
+			
+			while inv:room_for_item("output", book) and n > 0 do
+				
+				if inv:contains_item("input", {name = "default:book", count = 1}) then
+					inv:remove_item("input", {name = "default:book", count = 1})
+					inv:add_item("output", book)
+					n = n - 1
+				elseif inv:contains_item("input", {name = "default:paper", count = 3}) then
+					inv:remove_item("input", {name = "default:paper", count = 3})
+					inv:add_item("output", book)
+					n = n - 1
+				else
+					break
+				end
+				
+			end
+			
+			if n == 0 then
+				digilines.receptor_send(pos, digilines.rules.default, channel, "OK")
+			else
+				digilines.receptor_send(pos, digilines.rules.default, channel, "FULL @ " .. msg.copies - n .. "/" .. msg.copies)
+			end
+			
+		end
+		
+	end
 end
 
 minetest.register_node("mfu:mfu_active", {
@@ -173,10 +262,17 @@ minetest.register_node("mfu:mfu_active", {
 	paramtype2 = "facedir",
 	drop = "mfu:mfu",
 	can_dig = mfu_can_dig,
+                 
+	digiline =
+	{
+		receptor = {},
+		effector = {
+			action = mfu_on_digiline_receive
+		},
+	},
                                           
 	on_receive_fields = function(pos, formname, fields, sender)
 		if fields.set then
-			minetest.chat_send_all(fields.channel)
 			local meta = minetest.get_meta(pos);
 			meta:set_string('digiline_channel', fields.channel)
 			meta:set_string('formspec', prepare_formspec(fields.channel))
@@ -227,6 +323,14 @@ minetest.register_node("mfu:mfu", {
 	paramtype2 = "facedir",
 	drop = "mfu:mfu",
 	can_dig = mfu_can_dig,
+                  
+	digiline =
+	{
+		receptor = {},
+		effector = {
+			action = mfu_on_digiline_receive
+		},
+	},
                                    
 	on_construct = function( pos )
 		return on_construct( pos )
@@ -234,7 +338,6 @@ minetest.register_node("mfu:mfu", {
                                    
 	on_receive_fields = function(pos, formname, fields, sender)
 		if fields.set then
-			minetest.chat_send_all(fields.channel)
 			local meta = minetest.get_meta(pos);
 			meta:set_string('digiline_channel', fields.channel)
 			meta:set_string('formspec', prepare_formspec(fields.channel))
