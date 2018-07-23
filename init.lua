@@ -93,6 +93,11 @@ end
 local mfu_copy = function(pos, elapsed)
 	local meta = minetest.get_meta(pos)
 	local inv = meta:get_inventory()
+	
+	if inv:is_empty("master") then
+		return
+	end
+	
 	local input = inv:get_list("input")
 	local output = inv:get_list("output")
 	local master = inv:get_list("master")
@@ -150,16 +155,120 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		
 		if not inv:contains_item("input", {name = "default:book", count = 1}) and 
 			not inv:contains_item("input", {name = "default:paper", count = 3}) then
-			digilines.receptor_send(pos, digilines.rules.default, channel, "NO PAPER")
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "NO PAPER" })
 		elseif not inv:room_for_item("output", {name = "default:book_written", count = 1}) then
-			digilines.receptor_send(pos, digilines.rules.default, channel, "OUTPUT FULL")
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OUTPUT FULL" })
 		elseif not inv:is_empty("master") then
-			digilines.receptor_send(pos, digilines.rules.default, channel, "COPYING")
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "COPYING" })
 		else
-			digilines.receptor_send(pos, digilines.rules.default, channel, "IDLE")
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "IDLE" })
 		end
 		
 		return
+	end
+	
+	if listen_on and channel == listen_on and msg.command and msg.command == "SUPPLIES" then
+		
+		local data = {
+			["default:paper"] = 0,
+			["default:book"] = 0,
+			empty = 0,
+		}
+		
+		for i = 1,9,1 do
+			local s = inv:get_stack("input", i)
+			if not s:is_empty() then
+				local name = s:get_name()
+				data[name] = data[name] + s:get_count()
+			else 
+				data.empty = data.empty + 1
+			end
+		end
+		
+		local message = {
+			STATUS = "OK",
+			FREE = data.empty,
+			PAPER = tonumber(data["default:paper"]),
+			BOOKS = tonumber(data["default:book"]),
+			COPIES = math.floor(tonumber(data["default:paper"]) / 3) + tonumber(data["default:book"]),
+		}
+		
+		digilines.receptor_send(pos, digilines.rules.default, channel, message)
+		
+		return
+	end
+	
+	if listen_on and channel == listen_on and msg.command and msg.command == "EJECT" then
+		
+		
+		
+		local node = minetest.get_node(pos)
+		local pos1 = vector.new(pos)
+		
+		local x_velocity = 0
+		local z_velocity = 0
+		
+		-- Output always on the right
+		if node.param2 == 3 then pos1.z = pos1.z - 1  z_velocity =  1 end
+		if node.param2 == 2 then pos1.x = pos1.x - 1  x_velocity = -1 end
+		if node.param2 == 1 then pos1.z = pos1.z + 1  z_velocity = -1 end
+		if node.param2 == 0 then pos1.x = pos1.x + 1  x_velocity =  1 end
+		
+		local node1 = minetest.get_node(pos1) 
+		if not (minetest.get_item_group(node1.name, "tubedevice") > 0) then
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "NOT CONNECTED" })
+			return
+		end
+		
+		local n = 0
+		
+		for i = 1,16,1 do
+			local s = inv:get_stack("output", i)
+			if not s:is_empty() then
+				local r = pipeworks.tube_inject_item(pos, pos, vector.new(x_velocity, 0, z_velocity), s:to_table(), nil)
+				if r then
+					s:clear()
+					inv:set_stack("output", i, stack)
+					n = n + 1
+				else
+					digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "MALFUNCTION" })
+					return
+				end
+			end
+		end
+				
+		digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OK", COUNT = n })
+		
+		return
+	end
+	
+	if listen_on and channel == listen_on and (msg == "USERGUIDE" or msg.command == "USERGUIDE") then
+		local file = io.open (minetest.get_modpath("mfu") .. "/manual.txt")
+		local manual = file:read("*all")
+		io.close(file)
+		
+		local lpp = 14
+		
+		local book = ItemStack({name = "default:book_written", count = 1})
+		local data = {}
+		data.owner = S("MFU (itself)")
+		data.title = S("MFU User Guide")
+		data.description = S("Setup and operations manual for MFU ver. 1 rev. 1")
+		data.text = manual
+		data.page = 1
+		data.page_max = math.ceil((#data.text:gsub("[^\n]", "") + 1) / lpp) + 1
+		
+		book:get_meta():from_table({ fields = data })
+		
+		if inv:room_for_item("output", book) then
+			inv:add_item("output", book)
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OK" })
+		else
+			digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OUTPUT FULL" })
+		end
+		
+		return
+		
 	end
 	
 	if listen_on and channel == listen_on and msg.command and msg.command == "PRINT" and msg.copies and tonumber(msg.copies) > 0 then
@@ -206,7 +315,7 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		if not inv:contains_item("input", {name = "default:book", count = 1}) and 
 			not inv:contains_item("input", {name = "default:paper", count = 3}) then
 			
-				digilines.receptor_send(pos, digilines.rules.default, channel, "NO PAPER")
+				digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "NO PAPER" })
 				
 		else
 
@@ -230,9 +339,9 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 			end
 			
 			if n == 0 then
-				digilines.receptor_send(pos, digilines.rules.default, channel, "OK")
+				digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OK", COUNT = msg.copies })
 			else
-				digilines.receptor_send(pos, digilines.rules.default, channel, "FULL @ " .. msg.copies - n .. "/" .. msg.copies)
+				digilines.receptor_send(pos, digilines.rules.default, channel, { STATUS = "OUTPUT FULL", COUNT = msg.copies - n, DROPPED = n })
 			end
 			
 		end
@@ -241,8 +350,8 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 end
 
 minetest.register_node("mfu:mfu_active", {
-     description = "Multifunction Unit",
-     tiles = {	{name="mfu_top_active.png", 
+	description = "Multifunction Unit",
+	tiles = {	{name="mfu_top_active.png", 
 				animation={type="vertical_frames",
 				aspect_w=32, 
 				aspect_h=32, 
@@ -253,7 +362,7 @@ minetest.register_node("mfu:mfu_active", {
 			"mfu_back.png",
                   "mfu_front_active.png",
 			},
-	groups = {cracky = 1, not_in_creative_inventory = 1},
+	groups = {cracky = 1, not_in_creative_inventory = 1, tubedevice = 1, tubedevice_receiver = 1},
 	light_source = 3,
 	
 	allow_metadata_inventory_put = mfu_allow_metadata_inventory_put,
@@ -301,11 +410,38 @@ minetest.register_node("mfu:mfu_active", {
 		end
 	end,
                                           
+                                          
+	tube = (function() if minetest.get_modpath("pipeworks") then return {
+		-- using a different stack from defaut when inserting
+		insert_object = function(pos, node, stack, direction)
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			local timer = minetest.get_node_timer(pos)
+			if not timer:is_started() then
+				timer:start(1.0)
+			end
+			return inv:add_item("input", stack)
+		end,
+		can_insert = function(pos, node, stack, direction)
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			if stack:get_name() == "default:paper" or stack:get_name() == "default:book" then
+				return inv:room_for_item("input", stack)
+			else
+				return false
+			end
+		end,
+		-- the default stack, from which objects will be taken
+		input_inventory = "output",
+		connect_sides = {left = 1, right = 1, back = 1, bottom = 1,}
+	} end end)(),
+
+                                          
 })
 
 
 minetest.register_node("mfu:mfu", {
-     description = "Multifunction Unit",
+	description = "Multifunction Unit",
 	tiles = {	"mfu_top.png",
 			"mfu_bottom.png",
                   "mfu_side.png",
@@ -313,7 +449,7 @@ minetest.register_node("mfu:mfu", {
 			"mfu_back.png",
                   "mfu_front.png",
 			},
-	groups = {cracky = 1},
+	groups = {cracky = 1, tubedevice = 1, tubedevice_receiver = 1},
 	
 	on_place = minetest.rotate_node,
                                    
@@ -366,5 +502,29 @@ minetest.register_node("mfu:mfu", {
 		end
 	end,
 
+	tube = (function() if minetest.get_modpath("pipeworks") then return {
+		-- using a different stack from defaut when inserting
+		insert_object = function(pos, node, stack, direction)
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			local timer = minetest.get_node_timer(pos)
+			if not timer:is_started() then
+				timer:start(1.0)
+			end
+			return inv:add_item("input", stack)
+		end,
+		can_insert = function(pos, node, stack, direction)
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			if stack:get_name() == "default:paper" or stack:get_name() == "default:book" then
+				return inv:room_for_item("input", stack)
+			else
+				return false
+			end
+		end,
+		-- the default stack, from which objects will be taken
+		input_inventory = "output",
+		connect_sides = {left = 1, right = 1, back = 1, bottom = 1,}
+	} end end)(),
 	
 })

@@ -1,0 +1,124 @@
+MULTIFUNCTION PRINTING UNIT VERSION 1 REVISION 2
+SETUP AND OPERATIONS MANUAL
+================================================
+
+This manual can be obtained by issuing a command 
+USERGUIDE on the digiline channel the MFU is 
+listening on.
+
+GENERAL INFORMATION
+--------------------------------------------------
+The MFU combines a photocopier, a networking 
+printer, and a binding machine. It accepts both 
+empty books and loose paper sheets as the input 
+materials. The input inventory has 9 slots and is
+located on the left. If no books are supplied, the
+machine will attempt to make books out of paper. 
+The output inventory has 16 slots and is located 
+to the right. Under the inventories there is a 
+form for providing the name of the digiline channel
+the MFU should listen on. The button "Save" sets 
+the channel, and "Exit" discards changes. Empty 
+the field and press Save to disable networking.
+
+SETUP
+--------------------------------------------------
+The machine can be connected to a digiline cable 
+at all sides. It can also connect to plastic pipes,
+except from the top and the front. It needs no 
+additional electrical power.
+
+COPYING
+--------------------------------------------------
+In order to make copies, place a master copy in 
+the master slot of the machine. The MFU will begin
+making copies untill the master copy is removed, 
+or the output is filled, or no source materials 
+are left. In the last two cases, it will resume 
+operations once new supplies are provided and the 
+output is emptied respectively. The books are 
+marked with "(copy)" and are not subject to 
+further alteration.
+
+NETWORK PRINTING
+--------------------------------------------------
+The machine accepts commands in a form of a table.
+The table must contain the field "command" and may
+contain optional fields. The printed documents are
+marked with "(printed)" after tha author's name. 
+Not subject to alteration. If the machine is 
+copying, the printing will take priority and the 
+MFU will try to fulfill as many printing jobs as 
+possible. However, given the limited output size 
+reserve, it is best to avoid such situations. The 
+printed materials will be brochured and truncated
+according to same limitations as for handwritten 
+books. 
+
+The following is a summary of available commands 
+and responses. Both the command and the response 
+are transmitted over the same digiline channel, 
+and are differentiated by presence of "command" 
+field (or presence of "STATUS" field for the 
+response).
+
+[1] Printing:
+{
+  command = "PRINT",
+  copies = n,       // number of copies to print
+  author = "...",
+  text = "...",
+  watermark = "..." // e.g. for authenticity control
+}
+Response:
+{
+  STATUS = "OK/NO PAPER/OUTPUT FULL",
+  COUNT = n,   // number of printed copies
+  DROPPED = k  // number of copies that could not be printed
+}
+
+[2] Status query:
+{
+  command = "STATUS"
+}
+Response:
+{
+  STATUS = "NO PAPER/OUTPUT FULL/COPYING/IDLE"
+}
+
+[3] Supplies query:
+{
+  command = "SUPPLIES"
+}
+Response:
+{
+  STATUS = "OK",
+  FREE = n,   // in slots
+  PAPER = p,  // in sheets
+  BOOKS = b,  // in units
+  COPIES = c  // for all supplies combined, p/3+b
+}
+
+[4] Eject from the output inventory into tubes:
+{
+  command = "EJECT"
+}
+Response:
+{
+  STATUS = "NOT CONNECTED/MALFUNCTION/OK",
+  COUNT = n   // items ejected
+}
+
+[5] Print the user manual:
+{
+  command = "USERGUIDE"
+}
+or simply "USERGUIDE" as a string.
+Response:
+{
+  STATUS = "OK/OUTPUT FULL"
+}
+
+--------------------------------------------------
+HAPPY PRINTING!
+--------------------------------------------------
