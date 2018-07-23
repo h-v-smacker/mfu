@@ -416,10 +416,6 @@ minetest.register_node("mfu:mfu_active", {
 		insert_object = function(pos, node, stack, direction)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
-			local timer = minetest.get_node_timer(pos)
-			if not timer:is_started() then
-				timer:start(1.0)
-			end
 			return inv:add_item("input", stack)
 		end,
 		can_insert = function(pos, node, stack, direction)
@@ -507,10 +503,6 @@ minetest.register_node("mfu:mfu", {
 		insert_object = function(pos, node, stack, direction)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
-			local timer = minetest.get_node_timer(pos)
-			if not timer:is_started() then
-				timer:start(1.0)
-			end
 			return inv:add_item("input", stack)
 		end,
 		can_insert = function(pos, node, stack, direction)
@@ -528,3 +520,42 @@ minetest.register_node("mfu:mfu", {
 	} end end)(),
 	
 })
+
+
+local mfu_item_a = "default:meselamp"
+if minetest.get_modpath("technic") and technic.mod == "linuxforks" then
+	mfu_item_a = "technic:lv_led"
+end
+
+local mfu_item_b = "default:book"
+if minetest.get_modpath("digilines") then
+	mfu_item_b = "digilines:wire_std_00000000"
+end
+
+local mfu_item_c = "default:diamond"
+if minetest.get_modpath("pipeworks") then
+	mfu_item_c = "pipeworks:tube_1"
+end
+
+
+if minetest.get_modpath("technic") then
+	
+	minetest.register_craft({
+		output = "mfu:mfu",
+		recipe = {
+				{"homedecor:plastic_sheeting", "default:obsidian_glass", "homedecor:plastic_sheeting"},
+				{mfu_item_c, mfu_item_a, mfu_item_c},
+				{"technic:stainless_steel_ingot", mfu_item_b, "technic:stainless_steel_ingot"},
+			}
+		})
+	
+else
+	minetest.register_craft({
+		output = "mfu:mfu",
+		recipe = {
+				{"default:copper_ingot", "default:obsidian_glass", "default:copper_ingot"},
+				{mfu_item_c, mfu_item_a, mfu_item_c},
+				{"default:steel_ingot", mfu_item_b, "default:steel_ingot"},
+			}
+		})
+end
