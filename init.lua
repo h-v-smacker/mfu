@@ -209,9 +209,9 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		local z_velocity = 0
 		
 		-- Output always on the right
-		if node.param2 == 3 then pos1.z = pos1.z - 1  z_velocity =  1 end
+		if node.param2 == 3 then pos1.z = pos1.z + 1  z_velocity =  1 end
 		if node.param2 == 2 then pos1.x = pos1.x - 1  x_velocity = -1 end
-		if node.param2 == 1 then pos1.z = pos1.z + 1  z_velocity = -1 end
+		if node.param2 == 1 then pos1.z = pos1.z - 1  z_velocity = -1 end
 		if node.param2 == 0 then pos1.x = pos1.x + 1  x_velocity =  1 end
 		
 		local node1 = minetest.get_node(pos1) 
