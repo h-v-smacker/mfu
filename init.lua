@@ -147,6 +147,9 @@ local mfu_can_dig = function(pos, player)
 end
 
 local mfu_on_digiline_receive = function (pos, _, channel, msg)
+
+	if type(msg) ~= "table" then return end
+	
 	local meta = minetest.get_meta(pos);
 	local listen_on = meta:get_string('digiline_channel')
 	local inv = meta:get_inventory()
@@ -166,6 +169,7 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		
 		return
 	end
+	
 	
 	if listen_on and channel == listen_on and msg.command and msg.command == "SUPPLIES" then
 		
@@ -198,10 +202,9 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		return
 	end
 	
+	
 	if listen_on and channel == listen_on and msg.command and msg.command == "EJECT" then
-		
-		
-		
+
 		local node = minetest.get_node(pos)
 		local pos1 = vector.new(pos)
 		
@@ -242,7 +245,8 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		return
 	end
 	
-	if listen_on and channel == listen_on and (msg == "USERGUIDE" or msg.command == "USERGUIDE") then
+	
+	if listen_on and channel == listen_on and msg.command == "USERGUIDE" then
 		local file = io.open (minetest.get_modpath("mfu") .. "/manual.txt")
 		local manual = file:read("*all")
 		io.close(file)
@@ -270,6 +274,7 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		return
 		
 	end
+	
 	
 	if listen_on and channel == listen_on and msg.command and msg.command == "PRINT" and msg.copies and tonumber(msg.copies) > 0 then
 		
@@ -357,10 +362,10 @@ minetest.register_node("mfu:mfu_active", {
 				aspect_h=32, 
 				length=3}}, 
 			"mfu_bottom.png",
-                  "mfu_side.png",
-                  "mfu_side.png",
+			"mfu_side.png",
+			"mfu_side.png",
 			"mfu_back.png",
-                  "mfu_front_active.png",
+			"mfu_front_active.png",
 			},
 	groups = {cracky = 1, not_in_creative_inventory = 1, tubedevice = 1, tubedevice_receiver = 1},
 	light_source = 3,
@@ -440,10 +445,10 @@ minetest.register_node("mfu:mfu", {
 	description = "Multifunction Unit",
 	tiles = {	"mfu_top.png",
 			"mfu_bottom.png",
-                  "mfu_side.png",
-                  "mfu_side.png",
+			"mfu_side.png",
+			"mfu_side.png",
 			"mfu_back.png",
-                  "mfu_front.png",
+			"mfu_front.png",
 			},
 	groups = {cracky = 1, tubedevice = 1, tubedevice_receiver = 1},
 	

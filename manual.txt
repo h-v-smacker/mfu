@@ -114,7 +114,7 @@ Response:
 {
   command = "USERGUIDE"
 }
-or simply "USERGUIDE" as a string.
+
 Response:
 {
   STATUS = "OK/OUTPUT FULL"
