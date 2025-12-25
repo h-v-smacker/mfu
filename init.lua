@@ -31,6 +31,7 @@ local prepare_formspec = function(channel)
 				"list[context;output;4,0.5;4,4;]"..
 				
 				"field[0.25,4;4,1;channel;" .. S("Digiline channel:") .. ";" .. c .. "]"..
+				"tooltip[0.25,4;4,1;" .. S("Digiline channel to listen for commands.\nSend {command='USERGUIDE'} to print a manual.") .. "]" .. 
 				
 				"list[current_player;main;0,5;8,4;]"
 				
@@ -154,6 +155,9 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 	local listen_on = meta:get_string('digiline_channel')
 	local inv = meta:get_inventory()
 	
+	-- for suppressing response messages in future
+	if msg.quiet == nil then msg.quiet = false end
+	
 	if listen_on and channel == listen_on and msg.command and msg.command == "STATUS" then
 		
 		if not inv:contains_item("input", {name = "default:book", count = 1}) and 
@@ -257,7 +261,7 @@ local mfu_on_digiline_receive = function (pos, _, channel, msg)
 		local data = {}
 		data.owner = S("MFU (itself)")
 		data.title = S("MFU User Guide")
-		data.description = S("Setup and operations manual for MFU ver. 1 rev. 1")
+		data.description = S("Setup and operations manual for MFU ver. 1 rev. 3")
 		data.text = manual
 		data.page = 1
 		data.page_max = math.ceil((#data.text:gsub("[^\n]", "") + 1) / lpp) + 1
